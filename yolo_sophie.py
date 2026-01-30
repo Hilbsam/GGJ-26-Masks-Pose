@@ -2,30 +2,53 @@ import cv2
 from ultralytics import YOLO
 import socket
 
-# 1. Setup Network (IP and Port)
-UDP_IP = "127.0.0.1"
+# Netzwerk Setup
+UDP_IP = "pangolin.hilbsam.com"
 UDP_PORT = 6666
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# 2. Load YOLOv8 Pose model
-model = YOLO('yolov8n-pose.pt') 
-cap = cv2.VideoCapture(0) # Change to 1 or 2 for external camera
+# Modell laden
+model = YOLO('yolov8n-pose.pt')
+cap = cv2.VideoCapture(0) # 0 für intern, 1 für extern (ggf. auf 1 ändern)
+
+# Die Indizes für Nase, Oberkörper und Unterkörper (13 Punkte)
+SELECTED_POINTS = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
 while cap.isOpened():
     success, frame = cap.read()
     if not success: break
 
-    results = model(frame, verbose=False)
+    # .track() sorgt dafür, dass Personen eine feste ID behalten
+    # persist=True speichert die IDs über Frames hinweg
+    results = model.track(frame, verbose=False, max_det=2, persist=True)
+    
+    all_persons_data = []
+    
+    if results[0].keypoints is not None:
+        # Wir iterieren direkt über die gefundenen Personen-Instanzen
+        # YOLO trackt hier automatisch, wer Person 1 und wer Person 2 ist
+        for p_idx in range(len(results[0].keypoints)):
+            kpts = results[0].keypoints.xyn[p_idx].numpy()
+            
+            # Falls die KI Punkte für diese Person findet
+            if len(kpts) > 0:
+                filtered_coords = []
+                for i in SELECTED_POINTS:
+                    # Sicherstellen, dass der Index existiert
+                    if i < len(kpts):
+                        x, y = kpts[i]
+                        filtered_coords.append(f"{x:.4f},{y:.4f}")
+                
+                all_persons_data.append(",".join(filtered_coords))
+    
+    # Sende Daten nur, wenn mindestens eine Person gefunden wurde
+    if all_persons_data:
+        # Format: "P1_x,P1_y...#P2_x,P2_y..."
+        final_string = "#".join(all_persons_data)
+        sock.sendto(final_string.encode(), (UDP_IP, UDP_PORT))
 
-    for r in results:
-        if r.keypoints:
-            # Get normalized (0 to 1) coordinates
-            kpts = r.keypoints.xyn[0].numpy() 
-            # Create a string "x,y,x,y,..."
-            data = ",".join([f"{kp[0]:.4f},{kp[1]:.4f}" for kp in kpts])
-            sock.sendto(data.encode(), (UDP_IP, UDP_PORT))
-
-    cv2.imshow("Python Sender", frame)
+    # Vorschau-Fenster
+    cv2.imshow("YOLO Dual-Pose Tracking", frame)
     if cv2.waitKey(1) & 0xFF == ord('q'): break
 
 cap.release()
