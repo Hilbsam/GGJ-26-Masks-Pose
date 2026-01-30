@@ -3,12 +3,12 @@ from ultralytics import YOLO
 import socket
 
 # Netzwerk Setup
-UDP_IP = "pangolin.hilbsam.com"
+UDP_IP = "10.214.244.157"
 UDP_PORT = 6666
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Modell laden
-model = YOLO('yolov8n-pose.pt')
+# 2. Load YOLOv8 Pose model
+model = YOLO('yolo26s-pose.pt') 
 cap = cv2.VideoCapture(0) # 0 für intern, 1 für extern (ggf. auf 1 ändern)
 
 # Die Indizes für Nase, Oberkörper und Unterkörper (13 Punkte)
