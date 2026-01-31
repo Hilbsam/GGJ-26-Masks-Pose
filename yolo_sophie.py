@@ -22,8 +22,9 @@ while cap.isOpened():
     success, frame = cap.read()
     if not success: break
 
-    # Perform tracking (max_det=2 limits detection to two people)
-    results = model.track(frame, verbose=False, max_det=2, persist=True)
+    # tracker="botsort.yaml" ist oft stabiler als ByteTrack
+    # persist=True behält die IDs
+    results = model.track(frame, persist=True, tracker="botsort.yaml", verbose=False, max_det=4)
     
     all_persons_data = []
     
